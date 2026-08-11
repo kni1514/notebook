@@ -1,97 +1,123 @@
 name: Build Standalone Executables (All OS)
 
 on:
-  push:
-    branches: [ "main", "master" ]
-    tags: [ "v*" ]
-  pull_request:
-    branches: [ "main", "master" ]
-  workflow_dispatch:
+push:
+branches:
+- main
+- master
+tags:
+- "v*"
+
+pull_request:
+branches:
+- main
+- master
+
+workflow_dispatch:
 
 jobs:
-  build:
-    name: Build on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            asset_name: notebook-windows
-            artifact_name: notebook-windows.zip
-          - os: ubuntu-latest
-            asset_name: notebook-linux
-            artifact_name: notebook-linux.tar.gz
-          - os: macos-latest
-            asset_name: notebook-macos
-            artifact_name: notebook-macos.zip
+build:
+name: Build on ${{ matrix.os }}
+runs-on: ${{ matrix.os }}
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+```
+strategy:
+  fail-fast: false
+  matrix:
+    include:
+      - os: windows-latest
+        asset_name: notebook-windows
+        artifact_name: notebook-windows.zip
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - os: ubuntu-latest
+        asset_name: notebook-linux
+        artifact_name: notebook-linux.tar.gz
 
-      - name: Install Linux GUI Dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libegl1 \
-            libgl1 \
-            libglx-mesa0 \
-            libxcb-cursor0 \
-            libxcb-icccm4 \
-            libxcb-keysyms1 \
-            libxcb-render-util0 \
-            libxcb-shape0 \
-            libxcb-xfixes0 \
-            libxkbcommon-x11-0 \
-            libxcb-image0 \
-            libxcb-randr0 \
-            libxcb-xtest0 \
-            libxcb-xinerama0 \
-            libdbus-1-3
+      - os: macos-latest
+        asset_name: notebook-macos
+        artifact_name: notebook-macos.zip
 
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
+steps:
 
-      - name: Build Executable with PyInstaller
-        run: |
-          pyinstaller --noconfirm notebook.spec
+  - name: Checkout repository
+    uses: actions/checkout@v4
 
-      - name: Package Distribution (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          Compress-Archive -Path dist/notebook/* -DestinationPath dist/notebook-windows.zip
+  - name: Set up Python
+    uses: actions/setup-python@v5
+    with:
+      python-version: "3.11"
 
-      - name: Package Distribution (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          tar -czvf dist/notebook-linux.tar.gz -C dist/notebook .
+  - name: Install Linux GUI Dependencies
+    if: runner.os == 'Linux'
+    run: |
+      sudo apt-get update
+      sudo apt-get install -y \
+        libegl1 \
+        libgl1 \
+        libglx-mesa0 \
+        libxcb-cursor0 \
+        libxcb-icccm4 \
+        libxcb-keysyms1 \
+        libxcb-render-util0 \
+        libxcb-shape0 \
+        libxcb-xfixes0 \
+        libxkbcommon-x11-0 \
+        libxcb-image0 \
+        libxcb-randr0 \
+        libxcb-xtest0 \
+        libxcb-xinerama0 \
+        libdbus-1-3
 
-      - name: Package Distribution (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          cd dist && zip -r notebook-macos.zip notebook/
+  - name: Install Dependencies
+    run: |
+      python -m pip install --upgrade pip
+      pip install -r requirements.txt
+      pip install pyinstaller
 
-      - name: Upload Workflow Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.asset_name }}
-          path: dist/${{ matrix.artifact_name }}
+  - name: Build Executable with PyInstaller
+    run: |
+      pyinstaller --clean --noconfirm notebook.spec
 
-      - name: Create Release and Upload Asset
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/${{ matrix.artifact_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  - name: Show Build Output
+    shell: bash
+    run: |
+      echo "===== dist directory ====="
+      ls -la dist
+      echo "===== notebook directory ====="
+      if [ -d "dist/notebook" ]; then
+        ls -la dist/notebook
+      fi
+
+  - name: Package Windows
+    if: runner.os == 'Windows'
+    shell: pwsh
+    run: |
+      Compress-Archive `
+        -Path dist/notebook/* `
+        -DestinationPath dist/notebook-windows.zip
+
+  - name: Package Linux
+    if: runner.os == 'Linux'
+    run: |
+      tar -czvf dist/notebook-linux.tar.gz -C dist/notebook .
+
+  - name: Package macOS
+    if: runner.os == 'macOS'
+    run: |
+      cd dist
+      zip -r notebook-macos.zip notebook/
+
+  - name: Upload Workflow Artifact
+    uses: actions/upload-artifact@v4
+    with:
+      name: ${{ matrix.asset_name }}
+      path: dist/${{ matrix.artifact_name }}
+      if-no-files-found: error
+
+  - name: Create GitHub Release
+    if: startsWith(github.ref, 'refs/tags/')
+    uses: softprops/action-gh-release@v2
+    with:
+      files: dist/${{ matrix.artifact_name }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
