@@ -1,53 +1,59 @@
-name: Build Standalone Executables (All OS)
+name: Build Notebook
 
 on:
 push:
 branches:
 - main
-- master
-tags:
-- "v*"
-
-pull_request:
-branches:
-- main
-- master
-
 workflow_dispatch:
 
 jobs:
-build:
-name: Build on ${{ matrix.os }}
-runs-on: ${{ matrix.os }}
+windows:
+name: Windows Build
+runs-on: windows-latest
 
 ```
-strategy:
-  fail-fast: false
-  matrix:
-    include:
-      - os: windows-latest
-        asset_name: notebook-windows
-        artifact_name: notebook-windows.zip
-
-      - os: ubuntu-latest
-        asset_name: notebook-linux
-        artifact_name: notebook-linux.tar.gz
-
-      - os: macos-latest
-        asset_name: notebook-macos
-        artifact_name: notebook-macos.zip
-
 steps:
-  - name: Checkout repository
+  - name: Checkout
     uses: actions/checkout@v4
 
-  - name: Set up Python
+  - name: Setup Python
     uses: actions/setup-python@v5
     with:
       python-version: "3.11"
 
-  - name: Install Linux GUI Dependencies
-    if: runner.os == 'Linux'
+  - name: Install dependencies
+    run: |
+      python -m pip install --upgrade pip
+      pip install -r requirements.txt
+      pip install pyinstaller
+
+  - name: Build
+    run: |
+      pyinstaller --clean --noconfirm notebook.spec
+
+  - name: Upload Windows executable
+    uses: actions/upload-artifact@v4
+    with:
+      name: notebook-windows
+      path: dist/notebook.exe
+      if-no-files-found: error
+```
+
+linux:
+name: Linux Build
+runs-on: ubuntu-latest
+
+```
+steps:
+  - name: Checkout
+    uses: actions/checkout@v4
+
+  - name: Setup Python
+    uses: actions/setup-python@v5
+    with:
+      python-version: "3.11"
+
+  - name: Install Linux libraries
     run: |
       sudo apt-get update
       sudo apt-get install -y \
@@ -67,45 +73,60 @@ steps:
         libxcb-xinerama0 \
         libdbus-1-3
 
-  - name: Install Dependencies
+  - name: Install dependencies
     run: |
       python -m pip install --upgrade pip
       pip install -r requirements.txt
       pip install pyinstaller
 
-  - name: Build Executable
+  - name: Build
     run: |
       pyinstaller --clean --noconfirm notebook.spec
 
-  - name: Package Windows
-    if: runner.os == 'Windows'
-    shell: pwsh
+  - name: Make executable
     run: |
-      Compress-Archive -Path "dist/notebook/*" -DestinationPath "dist/notebook-windows.zip"
+      chmod +x dist/notebook
 
-  - name: Package Linux
-    if: runner.os == 'Linux'
-    run: |
-      tar -czf dist/notebook-linux.tar.gz -C dist/notebook .
-
-  - name: Package macOS
-    if: runner.os == 'macOS'
-    run: |
-      cd dist
-      zip -r notebook-macos.zip notebook/
-
-  - name: Upload Artifact
+  - name: Upload Linux executable
     uses: actions/upload-artifact@v4
     with:
-      name: ${{ matrix.asset_name }}
-      path: dist/${{ matrix.artifact_name }}
+      name: notebook-linux
+      path: dist/notebook
       if-no-files-found: error
+```
 
-  - name: Create GitHub Release
-    if: startsWith(github.ref, 'refs/tags/')
-    uses: softprops/action-gh-release@v2
+macos:
+name: macOS Build
+runs-on: macos-latest
+
+```
+steps:
+  - name: Checkout
+    uses: actions/checkout@v4
+
+  - name: Setup Python
+    uses: actions/setup-python@v5
     with:
-      files: dist/${{ matrix.artifact_name }}
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      python-version: "3.11"
+
+  - name: Install dependencies
+    run: |
+      python -m pip install --upgrade pip
+      pip install -r requirements.txt
+      pip install pyinstaller
+
+  - name: Build
+    run: |
+      pyinstaller --clean --noconfirm notebook.spec
+
+  - name: Make executable
+    run: |
+      chmod +x dist/notebook
+
+  - name: Upload macOS executable
+    uses: actions/upload-artifact@v4
+    with:
+      name: notebook-macos
+      path: dist/notebook
+      if-no-files-found: error
 ```
