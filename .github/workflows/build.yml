@@ -1,0 +1,81 @@
+name: Build Notebook
+
+on:
+push:
+branches:
+- main
+workflow_dispatch:
+
+jobs:
+build:
+name: Build ${{ matrix.name }}
+runs-on: ${{ matrix.os }}
+
+```
+strategy:
+  fail-fast: false
+  matrix:
+    include:
+      - name: Windows
+        os: windows-latest
+        artifact: notebook-windows
+
+      - name: Linux
+        os: ubuntu-latest
+        artifact: notebook-linux
+
+      - name: macOS
+        os: macos-latest
+        artifact: notebook-macos
+
+steps:
+  - name: Checkout
+    uses: actions/checkout@v4
+
+  - name: Setup Python
+    uses: actions/setup-python@v6
+    with:
+      python-version: "3.12"
+
+  - name: Install dependencies
+    run: |
+      python -m pip install --upgrade pip
+      pip install -r requirements.txt
+      pip install pyinstaller
+
+  - name: Build with PyInstaller
+    run: |
+      pyinstaller --clean --noconfirm notebook.spec
+
+  - name: Prepare binary
+    shell: bash
+    run: |
+      mkdir -p release
+
+      if [ "${{ runner.os }}" = "Windows" ]; then
+        cp dist/notebook.exe release/notebook-windows.exe
+      else
+        cp dist/notebook release/notebook-${{ runner.os == 'macOS' && 'macos' || 'linux' }}
+      fi
+
+  - name: Upload Windows binary
+    if: runner.os == 'Windows'
+    uses: actions/upload-artifact@v4
+    with:
+      name: ${{ matrix.artifact }}
+      path: release/notebook-windows.exe
+
+  - name: Upload Linux binary
+    if: runner.os == 'Linux'
+    uses: actions/upload-artifact@v4
+    with:
+      name: ${{ matrix.artifact }}
+      path: release/notebook-Linux
+
+  - name: Upload macOS binary
+    if: runner.os == 'macOS'
+    uses: actions/upload-artifact@v4
+    with:
+      name: ${{ matrix.artifact }}
+      path: release/notebook-macos
+```
