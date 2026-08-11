@@ -38,7 +38,6 @@ strategy:
         artifact_name: notebook-macos.zip
 
 steps:
-
   - name: Checkout repository
     uses: actions/checkout@v4
 
@@ -74,32 +73,20 @@ steps:
       pip install -r requirements.txt
       pip install pyinstaller
 
-  - name: Build Executable with PyInstaller
+  - name: Build Executable
     run: |
       pyinstaller --clean --noconfirm notebook.spec
-
-  - name: Show Build Output
-    shell: bash
-    run: |
-      echo "===== dist directory ====="
-      ls -la dist
-      echo "===== notebook directory ====="
-      if [ -d "dist/notebook" ]; then
-        ls -la dist/notebook
-      fi
 
   - name: Package Windows
     if: runner.os == 'Windows'
     shell: pwsh
     run: |
-      Compress-Archive `
-        -Path dist/notebook/* `
-        -DestinationPath dist/notebook-windows.zip
+      Compress-Archive -Path "dist/notebook/*" -DestinationPath "dist/notebook-windows.zip"
 
   - name: Package Linux
     if: runner.os == 'Linux'
     run: |
-      tar -czvf dist/notebook-linux.tar.gz -C dist/notebook .
+      tar -czf dist/notebook-linux.tar.gz -C dist/notebook .
 
   - name: Package macOS
     if: runner.os == 'macOS'
@@ -107,7 +94,7 @@ steps:
       cd dist
       zip -r notebook-macos.zip notebook/
 
-  - name: Upload Workflow Artifact
+  - name: Upload Artifact
     uses: actions/upload-artifact@v4
     with:
       name: ${{ matrix.asset_name }}
