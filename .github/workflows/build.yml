@@ -8,7 +8,7 @@ workflow_dispatch:
 
 jobs:
 build:
-name: Build ${{ matrix.name }}
+name: Build ${{ matrix.os_name }}
 runs-on: ${{ matrix.os }}
 
 ```
@@ -16,20 +16,20 @@ strategy:
   fail-fast: false
   matrix:
     include:
-      - name: Windows
-        os: windows-latest
+      - os: windows-latest
+        os_name: Windows
         artifact: notebook-windows
 
-      - name: Linux
-        os: ubuntu-latest
+      - os: ubuntu-latest
+        os_name: Linux
         artifact: notebook-linux
 
-      - name: macOS
-        os: macos-latest
+      - os: macos-latest
+        os_name: macOS
         artifact: notebook-macos
 
 steps:
-  - name: Checkout
+  - name: Checkout source
     uses: actions/checkout@v4
 
   - name: Setup Python
@@ -43,39 +43,49 @@ steps:
       pip install -r requirements.txt
       pip install pyinstaller
 
-  - name: Build with PyInstaller
+  - name: Build application
     run: |
       pyinstaller --clean --noconfirm notebook.spec
 
-  - name: Prepare binary
+  - name: Rename Windows executable
+    if: runner.os == 'Windows'
     shell: bash
     run: |
       mkdir -p release
+      cp dist/notebook.exe release/notebook.exe
 
-      if [ "${{ runner.os }}" = "Windows" ]; then
-        cp dist/notebook.exe release/notebook-windows.exe
-      else
-        cp dist/notebook release/notebook-${{ runner.os == 'macOS' && 'macos' || 'linux' }}
-      fi
+  - name: Rename Linux executable
+    if: runner.os == 'Linux'
+    shell: bash
+    run: |
+      mkdir -p release
+      cp dist/notebook release/notebook
+
+  - name: Rename macOS executable
+    if: runner.os == 'macOS'
+    shell: bash
+    run: |
+      mkdir -p release
+      cp dist/notebook release/notebook
 
   - name: Upload Windows binary
     if: runner.os == 'Windows'
     uses: actions/upload-artifact@v4
     with:
-      name: ${{ matrix.artifact }}
-      path: release/notebook-windows.exe
+      name: notebook-windows
+      path: release/notebook.exe
 
   - name: Upload Linux binary
     if: runner.os == 'Linux'
     uses: actions/upload-artifact@v4
     with:
-      name: ${{ matrix.artifact }}
-      path: release/notebook-Linux
+      name: notebook-linux
+      path: release/notebook
 
   - name: Upload macOS binary
     if: runner.os == 'macOS'
     uses: actions/upload-artifact@v4
     with:
-      name: ${{ matrix.artifact }}
-      path: release/notebook-macos
+      name: notebook-macos
+      path: release/notebook
 ```
