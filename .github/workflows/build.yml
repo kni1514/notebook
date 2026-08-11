@@ -1,161 +1,58 @@
-name: Notebook
+name: Notebook Build
 
 on:
-push:
-branches: [main, master]
-pull_request:
-branches: [main, master]
 workflow_dispatch:
+push:
+branches:
+- main
 
 jobs:
-
-# =========================
-
-# WINDOWS BUILD
-
-# =========================
-
-build-windows:
+windows:
 runs-on: windows-latest
-
-```
 steps:
-  - name: Checkout repository
-    uses: actions/checkout@v4
+- uses: actions/checkout@v4
+- uses: actions/setup-python@v5
+with:
+python-version: "3.11"
+- run: python -m pip install --upgrade pip
+- run: pip install -r requirements.txt
+- run: pip install pyinstaller
+- run: pyinstaller --clean --noconfirm notebook.spec
+- uses: actions/upload-artifact@v4
+with:
+name: notebook-windows
+path: dist/
 
-  - name: Set up Python
-    uses: actions/setup-python@v5
-    with:
-      python-version: "3.11"
-
-  - name: Install dependencies
-    run: |
-      python -m pip install --upgrade pip
-      pip install pyinstaller
-      pip install -r requirements.txt
-
-  - name: Build Windows executable
-    run: |
-      pyinstaller --clean --noconfirm notebook.spec
-
-  - name: Prepare download directory
-    shell: pwsh
-    run: |
-      New-Item -ItemType Directory -Force -Path download
-
-  - name: Copy Windows build
-    shell: pwsh
-    run: |
-      Copy-Item dist/notebook.exe download/notebook.exe -Force
-
-  - name: Upload Windows artifact
-    uses: actions/upload-artifact@v4
-    with:
-      name: notebook-windows
-      path: download/notebook.exe
-```
-
-# =========================
-
-# LINUX BUILD
-
-# =========================
-
-build-linux:
+linux:
 runs-on: ubuntu-latest
-
-```
 steps:
-  - name: Checkout repository
-    uses: actions/checkout@v4
+- uses: actions/checkout@v4
+- uses: actions/setup-python@v5
+with:
+python-version: "3.11"
+- run: sudo apt-get update
+- run: sudo apt-get install -y libegl1 libgl1 libxcb-cursor0 libxkbcommon-x11-0
+- run: python -m pip install --upgrade pip
+- run: pip install -r requirements.txt
+- run: pip install pyinstaller
+- run: pyinstaller --clean --noconfirm notebook.spec
+- uses: actions/upload-artifact@v4
+with:
+name: notebook-linux
+path: dist/
 
-  - name: Set up Python
-    uses: actions/setup-python@v5
-    with:
-      python-version: "3.11"
-
-  - name: Install Linux libraries
-    run: |
-      sudo apt-get update
-      sudo apt-get install -y \
-        libegl1 \
-        libgl1 \
-        libxcb-cursor0 \
-        libxkbcommon-x11-0
-
-  - name: Install dependencies
-    run: |
-      python -m pip install --upgrade pip
-      pip install pyinstaller
-      pip install -r requirements.txt
-
-  - name: Build Linux executable
-    run: |
-      pyinstaller --clean --noconfirm notebook.spec
-
-  - name: Prepare download directory
-    run: |
-      mkdir -p download
-
-  - name: Copy Linux build
-    run: |
-      cp dist/notebook download/notebook
-
-  - name: Make executable
-    run: |
-      chmod +x download/notebook
-
-  - name: Upload Linux artifact
-    uses: actions/upload-artifact@v4
-    with:
-      name: notebook-linux
-      path: download/notebook
-```
-
-# =========================
-
-# MACOS BUILD
-
-# =========================
-
-build-macos:
+macos:
 runs-on: macos-latest
-
-```
 steps:
-  - name: Checkout repository
-    uses: actions/checkout@v4
-
-  - name: Set up Python
-    uses: actions/setup-python@v5
-    with:
-      python-version: "3.11"
-
-  - name: Install dependencies
-    run: |
-      python -m pip install --upgrade pip
-      pip install pyinstaller
-      pip install -r requirements.txt
-
-  - name: Build macOS executable
-    run: |
-      pyinstaller --clean --noconfirm notebook.spec
-
-  - name: Prepare download directory
-    run: |
-      mkdir -p download
-
-  - name: Copy macOS build
-    run: |
-      cp dist/notebook download/notebook
-
-  - name: Make executable
-    run: |
-      chmod +x download/notebook
-
-  - name: Upload macOS artifact
-    uses: actions/upload-artifact@v4
-    with:
-      name: notebook-macos
-      path: download/notebook
-```
+- uses: actions/checkout@v4
+- uses: actions/setup-python@v5
+with:
+python-version: "3.11"
+- run: python -m pip install --upgrade pip
+- run: pip install -r requirements.txt
+- run: pip install pyinstaller
+- run: pyinstaller --clean --noconfirm notebook.spec
+- uses: actions/upload-artifact@v4
+with:
+name: notebook-macos
+path: dist/
