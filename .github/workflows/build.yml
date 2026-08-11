@@ -64,35 +64,72 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install pyinstaller
 
-      - name: Build Python Executable
+      - name: Build Python Executable (with debug output)
         shell: bash
         run: |
           set -euo pipefail
-          pyinstaller --noconfirm notebook.spec
+          echo "Runner OS: $RUNNER_OS"
+          echo "Matrix: os=${{ matrix.os }}, artifact=${{ matrix.artifact }}, output=${{ matrix.output }}"
+          echo "Workspace contents:"
+          ls -la .
+
+          # Ensure spec exists
+          if [ ! -f notebook.spec ]; then
+            echo "ERROR: notebook.spec not found in repository root."
+            echo "Listing repo files:"
+            git ls-files
+            exit 1
+          fi
+
+          # Run pyinstaller and capture output
+          pyinstaller --noconfirm notebook.spec || {
+            echo "PyInstaller failed. Showing dist/ and build/ for diagnosis:"
+            ls -R dist || true
+            ls -R build || true
+            exit 1
+          }
+
+          echo "PyInstaller finished. Dist directory:"
+          ls -R dist || true
 
           # Try to find the built executable inside dist/.
-          # First look for a file that matches the expected output name (e.g. notebook or notebook.exe).
           FILE=$(find dist -type f -name "${{ matrix.output }}" -print -quit || true)
 
-          # If not found, pick the first executable file under dist/ (useful when PyInstaller creates a folder).
+          # If not found, pick the first executable file under dist/ (useful when PyInstaller creates a single file or variant names).
           if [ -z "$FILE" ]; then
             FILE=$(find dist -type f -executable -print -quit || true)
           fi
 
+          # If still not found, try top-level files in a one-folder bundle (e.g., dist/Notebook/Notebook)
           if [ -z "$FILE" ]; then
-            echo "No executable found in dist/"
+            FIRST_DIR=$(find dist -mindepth 1 -maxdepth 1 -type d -print -quit || true)
+            if [ -n "$FIRST_DIR" ]; then
+              FILE=$(find "$FIRST_DIR" -type f -executable -print -quit || true)
+            fi
+          fi
+
+          if [ -z "$FILE" ]; then
+            echo "ERROR: No executable found in dist/"
             ls -R dist || true
             exit 1
           fi
 
           echo "Found build artifact: $FILE"
           cp "$FILE" "${{ matrix.output }}"
+          echo "Copied to ${ { matrix.output } }" || true
 
-      - name: Upload Artifact
+      - name: Upload primary artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.output }}
+
+      - name: Upload dist folder for debugging
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}-dist
+          path: dist
 
   publish:
     needs: build
